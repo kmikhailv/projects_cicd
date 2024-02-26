@@ -1,0 +1,128 @@
+    ---
+version: '3.4'
+x-extra_hosts: &extra_hosts
+  armk: 37.0.1.31
+  armr: 37.0.1.32
+  arms: 37.0.1.33
+  rbv1: 37.3.251.110
+  rbv2: 37.3.251.111
+  sbv1: 37.3.195.105
+  sbv2: 37.3.195.106
+
+services:
+
+  armk:
+    image: raz
+    build: .
+    hostname: armk
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      raz:
+        ipv4_address: 37.0.1.31
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+
+  armr:
+    image: raz
+    hostname: armr
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      raz:
+        ipv4_address: 37.0.1.32
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    environment:
+      - DISPLAY=unix$DISPLAY
+    privileged: true
+    depends_on:
+      - "armk"
+
+  arms:
+    image: raz
+    hostname: arms
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      raz:
+        ipv4_address: 37.0.1.33
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    environment:
+      - DISPLAY=unix$DISPLAY
+    privileged: true
+    depends_on:
+      - "armk"
+
+  rbv1:
+    image: raz
+    hostname: rbv1
+    volumes:
+      - .:$WORKSPACE
+    extra_hosts: *extra_hosts
+    networks:
+      raz:
+        ipv4_address: 37.3.251.110
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    depends_on:
+      - "armk"
+
+  rbv2:
+    image: raz
+    hostname: rbv2
+    volumes:
+      - .:$WORKSPACE
+    extra_hosts: *extra_hosts
+    networks:
+      raz:
+        ipv4_address: 37.3.251.111
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    depends_on:
+      - "armk"
+
+  sbv1:
+    image: raz
+    hostname: sbv1
+    volumes:
+      - .:$WORKSPACE
+    extra_hosts: *extra_hosts
+    networks:
+      raz:
+        ipv4_address: 37.3.195.105
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    depends_on:
+      - "armk"
+
+  sbv2:
+    image: raz
+    hostname: sbv2
+    volumes:
+      - .:$WORKSPACE
+    extra_hosts: *extra_hosts
+    networks:
+      raz:
+        ipv4_address: 37.3.195.106
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    depends_on:
+      - "armk"
+
+networks:
+  raz:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 37.0.0.0/8

@@ -1,0 +1,74 @@
+---
+version: '3.4'
+x-extra_hosts: &extra_hosts
+  bspu: 192.168.100.50
+  stz: 192.168.100.51
+  gbo: 192.168.100.61
+  phins: 192.168.100.63
+  dopl: 192.168.100.64
+  pult: 192.168.100.100
+
+services:
+
+  bspu_build:
+    image: vit
+    build: .
+    hostname: bspu
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      vit_build:
+        ipv4_address: 192.168.100.50
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=vit
+
+  stz_build:
+    image: vit
+    hostname: stz
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      vit_build:
+        ipv4_address: 192.168.100.51
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=vit
+    depends_on:
+      - "bspu_build"
+
+  pult_build:
+    image: vit
+    hostname: pult
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      vit_build:
+        ipv4_address: 192.168.100.100
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=vit
+    depends_on:
+      - "bspu_build"
+
+networks:
+  vit_build:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24

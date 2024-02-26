@@ -1,0 +1,177 @@
+// * start compose - if [ -z `docker ps -q --no-trunc | grep $(docker-compose ps -q bspu)` ]; then docker-compose build ; docker-compose up -d ; fi
+//  save state about
+// * start sim
+// * copy mission & bg tops
+// * start.sh
+// * mission resurection started automatically
+// * inspect for cores, notify, compress and publish cores and logs
+@Library('mattermostNotify') _
+def long_test_running = 0;
+
+pipeline {
+//    agent { dockerfile true }
+	agent any
+	triggers {
+	//Run every 17 minutes (1000 seconds)
+	 parameterizedCron(env.BRANCH_NAME == params.branch ? '''*/17 * * * *''' : '')
+    }
+    parameters {
+    string(name: 'branch', defaultValue: 'long_test', description: 'Name of long test branch')
+    }
+    stages {
+    
+    stage('Check long test results') {
+       when {
+           branch params.branch
+           triggeredBy 'ParameterizedTimerTriggerCause'
+        }
+        steps {
+		echo "${currentBuild.buildCauses}" // same as currentBuild.getBuildCauses()
+		script {
+		   def unixTs = sh(
+              script: 'date +%s',
+              returnStdout: true
+            ).trim()
+            long_test_running = sh (script: "docker-compose  exec -T bspu ls", returnStatus: true)
+			def suffix = unixTs.reverse().substring(3).reverse()
+			def jenkins_user_uid = sh(script: "id -u ${USER}", returnStdout: true).trim()
+			def core_file_not_exists = sh (script: "docker-compose  exec -u vityaz -T bspu bash -c \"echo ~/work_dir/core*${suffix}* ; ls ~/work_dir/core*${suffix}*\" ", returnStatus: true)
+		    if(!core_file_not_exists){
+		        currentBuild.result = 'FAILURE'
+		        sh "docker-compose  exec -u vityaz -T bspu bash -c \"cp ~/work_dir/core*${suffix}* $WORKSPACE/\""
+		        sh "docker-compose  exec -T bspu bash -c \"chown ${jenkins_user_uid} $WORKSPACE/core*\" "
+			    archiveArtifacts artifacts: "core*${suffix}*"
+		    }
+		}
+		}
+    }
+
+        stage('Launching long test containers') {
+       when {
+            branch params.branch
+            anyOf{
+            not {triggeredBy 'ParameterizedTimerTriggerCause'} ;
+            not {equals expected: 0, actual: long_test_running}
+            }
+        }
+            steps {
+	        sh 'docker-compose down'
+            sh 'docker-compose build'
+            sh 'docker-compose up -d'
+           }
+        }
+        
+        stage('Init long test') {
+        when {
+            branch params.branch
+            anyOf{
+            not {triggeredBy 'ParameterizedTimerTriggerCause'} ;
+            not {equals expected: 0, actual: long_test_running}
+            }
+        }
+            steps {
+            
+            		sh 'chmod 777 .'
+        			sh 'docker-compose  exec -T pult bash -c \"chown -R $UID $WORKSPACE/\" '
+        			sh './bin/jenkins_init_vityaz_bin.sh'
+        			sh 'docker-compose  exec -T pult bash -c \"chown -R vityaz $WORKSPACE/vityaz-bin/\" '
+ 	           }
+        }
+
+        stage('Build long test') {
+                when {
+               branch params.branch
+               anyOf{
+               not {triggeredBy 'ParameterizedTimerTriggerCause'} ;
+               not {equals expected: 0, actual: long_test_running}
+               }
+        }
+            steps {
+        			sh 'docker-compose  exec -u vityaz -T pult bash -c \"$WORKSPACE/vityaz-bin/vityaz/bin/build_and_upload.sh\"'
+        			sh 'docker-compose  exec -u vityaz -T pult bash -c \"$WORKSPACE/vityaz-bin/vityaz/bin/build_pult.sh\"'
+ 	           }
+        }
+
+        stage('Long test') {
+            when {
+               branch params.branch
+            anyOf{
+            not {triggeredBy 'ParameterizedTimerTriggerCause'} ;
+            not {equals expected: 0, actual: long_test_running}
+            }
+            }
+        
+	        steps {
+		      script {
+	    	    try{
+	        			sh 'docker-compose  exec -u vityaz -T bspu bash -lc \"/home/vityaz/start.sh sim sim\"'
+	        			sh 'docker-compose  exec -u vityaz -T bspu bash -lc \"cp $WORKSPACE/src/sim/*.txt /home/vityaz/work_dir/ \"'
+	        			sh 'docker-compose  exec -u vityaz -T bspu bash -lc \"sleep 20s ; $WORKSPACE/vityaz-bin/vityaz/bin/check_running.sh bspu\"'
+	        			sh 'docker-compose  exec -u vityaz -T stz bash -lc \"$WORKSPACE/vityaz-bin/vityaz/bin/check_running.sh stz\"'
+	        			sh 'docker-compose  exec -u vityaz -T bspu bash -lc \"$WORKSPACE/vityaz-bin/vityaz/bin/check_running.sh rios\"'
+	        			sh 'docker-compose  exec -u vityaz -T bspu bash -lc \"cd /home/vityaz/work_dir ; screen -dmS sim ./sim_main/sim_main \"'
+	
+	        			sh 'docker-compose  exec -u vityaz -T pult bash -lc \"vncserver -kill :10 || rm /tmp/.X11-unix/X10 ; echo Xnvc  session cleaned up \"'
+	        			sh 'docker-compose  exec -u vityaz -T pult bash -lc \"\
+	        			    vncserver -geometry 1920x1080 :10 ; \
+	        			    sleep 10 ; \
+	        			    export DISPLAY=:10 ; \
+	        			    /home/vityaz/pult.sh ; \"'
+		        } catch (err) {
+	              currentBuild.result = 'FAILURE'
+	              sh 'docker-compose down'
+	      	   }
+			  }
+	 	     }
+	   }
+	        
+        
+        stage('Start ordinary test containers') {
+            when {
+               not { branch params.branch }
+               not { triggeredBy 'ParameterizedTimerTriggerCause' }
+            }
+ 	        steps {
+    	     	 sh ('docker-compose -f docker-compose-build.yml --project-name vityaz_build build ; docker-compose -f docker-compose-build.yml --project-name vityaz_build up -d')
+ 	        }
+         }
+
+        stage('Init ordinary test') {
+            when {
+               not { branch params.branch }
+               not { triggeredBy 'ParameterizedTimerTriggerCause' }
+            }
+            steps {            
+        			sh 'docker-compose -f docker-compose-build.yml --project-name vityaz_build exec -T pult_build bash -c \"chown -R $UID $WORKSPACE/\" '
+        			sh './bin/jenkins_init_vityaz_bin.sh'
+        			sh 'docker-compose -f docker-compose-build.yml --project-name vityaz_build exec -T pult_build bash -c \"chown -R vityaz $WORKSPACE/vityaz-bin/\" '
+ 	        }
+        }
+
+        stage('Build ordinary test') {
+            when {
+               not { branch params.branch }
+               not { triggeredBy 'ParameterizedTimerTriggerCause' }
+            }
+            steps {
+        			sh 'docker-compose -f docker-compose-build.yml --project-name vityaz_build exec -u vityaz -T pult_build bash -c \"$WORKSPACE/vityaz-bin/vityaz/bin/build_and_upload.sh\"'
+        			sh 'docker-compose -f docker-compose-build.yml --project-name vityaz_build exec -u vityaz -T pult_build bash -c \"$WORKSPACE/vityaz-bin/vityaz/bin/build_pult.sh\"'
+ 	           }
+        }
+
+        
+    }
+    post {
+        always { 
+           sh 'docker-compose -f docker-compose-build.yml --project-name vityaz_build down'
+        }
+        failure {
+          script {
+		    mattermostNotify.send("Build",
+		    					 "https://redmine.rtc.ru:8181/scm/hg/vityaz/rev",
+		    					 "http://redmine.rtc.ru:8065/hooks/r7btrep3xjns5egh96cyucjicr")
+		  }
+        }
+        
+    }
+}

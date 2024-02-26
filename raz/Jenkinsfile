@@ -1,0 +1,34 @@
+@Library('mattermostNotify') _
+pipeline {
+    agent any
+    
+    stages {
+	    stage('Launch'){
+            parallel {
+    stage('Launch hosts') {
+        steps {
+    			sh 'docker-compose --project-name razn up -d'
+        	}
+    	}
+    stage('Build and upload') {
+        steps {
+    			sh "docker-compose  --project-name razn exec -T armk chmod o+w -R \"$WORKSPACE/../\""
+    			sh "docker-compose  --project-name razn exec -T armk chmod 777 \"$WORKSPACE/../\""
+    			sh "docker-compose  --project-name razn exec -T -u razn armk bash -c \"$WORKSPACE/scripts/build_and_upload.sh\""
+        	}
+    	}
+       }
+      }
+    	
+	}
+
+post {
+    failure {
+        script {
+		    mattermostNotify.send("Build",
+		    					 "https://redmine.rtc.ru:8181/scm/hg/a.alexeev3/modern/rev",
+		    					 "http://redmine.rtc.ru:8065/hooks/yjzsw3iqsige8paq7wtf1xorih")
+		    }
+        }
+    }
+}

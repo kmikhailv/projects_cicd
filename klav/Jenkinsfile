@@ -1,0 +1,45 @@
+def NotifyProject(stageName) {
+   sh "REV=\$(hg id -i | tr -d '+') ; USER=\$(hg log --limit 1 --template '{author}'); curl -i -X POST -d 'payload={\"text\": \"'${env.JOB_NAME}' - ${stageName} '${BUILD_URL}' failed. Revision ['\$REV'](https://redmine.rtc.ru:8181/scm/hg/koval/tops-Klav/rev/'\$REV') . Made by @'\$USER'  \",   \"username\": \"Jenkins\",\"icon_url\": \"https://wiki.jenkins.io/download/attachments/2916393/logo.png\"}' http://redmine.rtc.ru:8065/hooks/bqk6gm49nprzupnfotmn41mmah"
+}
+
+node('master') {
+            stage("Build board") {
+			    try{
+         			checkout scm
+        			docker.image("redmine.rtc.ru:5000/rosa").inside {
+        			echo 'Building board...'
+        			sh 'mkdir -p build;cd build;cmake ../;make -j2;make install'
+        			sh "cd build/; tar -czf ../${env.BRANCH_NAME}-Klav-build.tar.gz Klav-build/"
+                   }
+			    }
+			    catch(error){
+	            NotifyProject('Build board')
+	            throw error;
+			    }
+				finally{
+		            archiveArtifacts artifacts: "${env.BRANCH_NAME}-Klav-build.tar.gz", onlyIfSuccessful: true
+				}
+			    
+              }
+
+
+            stage("Build pult") {
+			    try{
+         			checkout scm
+			        docker.image("redmine.rtc.ru:5000/astra").inside {
+        				echo 'Building pult...'
+        				sh './source/pult/build_pult.sh'
+        				sh "cd binaries/pult/; tar -czf ../../${env.BRANCH_NAME}-bin-auanpa.tar.gz bin-auanpa/"
+        			}
+				}
+			    catch(error){
+	            NotifyProject('Build pult')
+            		throw error;
+				    }
+				    finally{
+				            archiveArtifacts artifacts: "${env.BRANCH_NAME}-bin-auanpa.tar.gz", onlyIfSuccessful: true
+				    }
+
+                }
+             
+}

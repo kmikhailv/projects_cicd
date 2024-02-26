@@ -1,0 +1,155 @@
+---
+version: '3.4'
+x-extra_hosts: &extra_hosts
+  bspu: 192.168.0.50
+  stz: 192.168.0.51
+  gbo: 192.168.0.61
+  phins: 192.168.0.63
+  dopl: 192.168.0.64
+  pult: 192.168.0.100
+
+services:
+
+  bspu:
+    image: klav
+    ulimits:
+       core:
+         soft: 99999999999
+         hard: 99999999999
+    build: .
+    hostname: bspu
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      klav:
+        ipv4_address: 192.168.0.50
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=klav
+
+  stz:
+    image: klav
+    ulimits:
+       core:
+         soft: 99999999999
+         hard: 99999999999
+    hostname: stz
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      klav:
+        ipv4_address: 192.168.0.51
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=klav
+    depends_on:
+      - "bspu"
+
+  gbo:
+    image: klav
+    ulimits:
+       core:
+         soft: 99999999999
+         hard: 99999999999
+    hostname: gbo
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      klav:
+        ipv4_address: 192.168.0.61
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=klav
+    depends_on:
+      - "bspu"
+
+  phins:
+    image: klav
+    ulimits:
+       core:
+         soft: 99999999999
+         hard: 99999999999
+    hostname: phins
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      klav:
+        ipv4_address: 192.168.0.63
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=klav
+    depends_on:
+      - "bspu"
+
+  dopl:
+    image: klav
+    ulimits:
+       core:
+         soft: 99999999999
+         hard: 99999999999
+    hostname: dopl
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      klav:
+        ipv4_address: 192.168.0.64
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=klav
+    depends_on:
+      - "bspu"
+
+  pult:
+    image: klav
+    ulimits:
+       core:
+         soft: 99999999999
+         hard: 99999999999
+    hostname: pult
+    volumes:
+      - .:$WORKSPACE
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.XIM-unix:/tmp/.XIM-unix
+    extra_hosts: *extra_hosts
+    networks:
+      klav:
+        ipv4_address: 192.168.0.100
+    command: ["bash", "-c", "/etc/init.d/ssh start; sleep infinity"]
+    privileged: true
+    environment:
+      - DISPLAY=unix$DISPLAY
+      - USER=klav
+    depends_on:
+      - "bspu"
+
+networks:
+  klav:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.0.0/24
